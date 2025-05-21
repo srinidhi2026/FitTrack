@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { DataProvider } from "./contexts/DataContext";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { ThemeProvider as NextThemesProvider } from "next-themes";
 
 // Layouts
 import MainLayout from "./components/layout/MainLayout";
@@ -22,30 +23,32 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <DataProvider>
-              <Routes>
-                {/* Auth routes */}
-                <Route path="/login" element={<LoginPage />} />
-                
-                {/* Protected routes */}
-                <Route path="/" element={<MainLayout />}>
-                  <Route index element={<Dashboard />} />
-                  <Route path="workouts" element={<WorkoutsPage />} />
-                  <Route path="nutrition" element={<NutritionPage />} />
-                  <Route path="progress" element={<ProgressPage />} />
-                </Route>
-              </Routes>
-            </DataProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
+    <NextThemesProvider enableSystem attribute="class" defaultTheme="system">
+      <ThemeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthProvider>
+              <DataProvider>
+                <Routes>
+                  {/* Auth routes */}
+                  <Route path="/login" element={<LoginPage />} />
+                  
+                  {/* Protected routes */}
+                  <Route path="/" element={<MainLayout />}>
+                    <Route index element={<Dashboard />} />
+                    <Route path="workouts" element={<WorkoutsPage />} />
+                    <Route path="nutrition" element={<NutritionPage />} />
+                    <Route path="progress" element={<ProgressPage />} />
+                  </Route>
+                </Routes>
+              </DataProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </NextThemesProvider>
   </QueryClientProvider>
 );
 

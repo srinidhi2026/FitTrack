@@ -1,21 +1,26 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Workout, Exercise, WorkoutDay } from '@/types/workout';
 import { ProteinFood, ProteinGoal, BudgetLevel } from '@/types/nutrition';
 import { ProgressEntry } from '@/types/progress';
 import { useAuth } from './AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { formatDistanceToNow } from 'date-fns';
+import { endOfDay, startOfDay, subDays } from 'date-fns';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
 
 interface DataContextType {
   // Workouts
   workouts: Workout[];
   getTodaysWorkout: () => Workout | undefined;
   getWorkoutByDay: (day: WorkoutDay) => Workout | undefined;
-  markWorkoutDone: () => void;
+  markWorkoutDone: () => Promise<void>;
   
   // Nutrition
   proteinGoal: ProteinGoal;
-  updateProteinConsumed: (grams: number) => void;
+  updateProteinConsumed: (grams: number) => Promise<void>;
   proteinFoods: ProteinFood[];
   budgetFilter: BudgetLevel | 'all';
   setBudgetFilter: (level: BudgetLevel | 'all') => void;
@@ -23,7 +28,11 @@ interface DataContextType {
   
   // Progress
   progressEntries: ProgressEntry[];
-  addProgressEntry: (entry: Omit<ProgressEntry, 'date'>) => void;
+  addProgressEntry: (entry: Omit<ProgressEntry, 'date'>) => Promise<void>;
+  
+  // Reports
+  generateExcelReport: () => Promise<void>;
+  generatePDFReport: () => Promise<void>;
   
   // Loading state
   isLoading: boolean;
@@ -31,7 +40,7 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-// Mock data - in a real app this would come from an API
+// Mock exercises data - will be replaced with data from Supabase later
 const mockExercises: Record<string, Exercise[]> = {
   push: [
     {
@@ -212,7 +221,8 @@ const mockExercises: Record<string, Exercise[]> = {
   ]
 };
 
-const mockWorkouts: Workout[] = [
+// Initial workout structure
+const initialWorkouts: Workout[] = [
   {
     day: 'monday',
     title: 'Push Day',
@@ -379,7 +389,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   // State for workouts
-  const [workouts, setWorkouts] = useState<Workout[]>(mockWorkouts);
+  const [workouts, setWorkouts] = useState<Workout[]>(initialWorkouts);
   
   // State for protein tracking
   const [proteinGoal, setProteinGoal] = useState<ProteinGoal>({
@@ -388,7 +398,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   
   // State for protein foods
-  const [proteinFoods, setProteinFoods] = useState<ProteinFood[]>(mockProteinFoods);
+  const [proteinFoods, setProteinFoods] = useState<ProteinFood[]>([]);
   const [budgetFilter, setBudgetFilter] = useState<BudgetLevel | 'all'>('all');
   
   // State for tracking progress
@@ -397,9 +407,116 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Loading state
   const [isLoading, setIsLoading] = useState(true);
 
+  // Load exercises and protein foods data
+  useEffect(() => {
+    const fetchExercises = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('exercises')
+          .select('*');
+
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          // Map data to Exercise type and update workouts with actual exercises
+          const exercisesMap: Record<string, Exercise[]> = {};
+          
+          // Group exercises by muscle group
+          data.forEach((exercise: any) => {
+            const muscleGroup = exercise.muscle_group;
+            if (!exercisesMap[muscleGroup]) {
+              exercisesMap[muscleGroup] = [];
+            }
+            
+            exercisesMap[muscleGroup].push({
+              id: exercise.id,
+              name: exercise.name,
+              sets: exercise.sets,
+              repsRange: exercise.reps_range,
+              muscleGroup: exercise.muscle_group,
+              imageUrl: exercise.image_url,
+              instructions: exercise.instructions
+            });
+          });
+          
+          // For demo purpose, let's map chest, shoulders, triceps exercises to push
+          // back, biceps to pull, and legs to legs
+          const pushExercises = [
+            ...(exercisesMap.chest || []), 
+            ...(exercisesMap.shoulders || []), 
+            ...(exercisesMap.triceps || [])
+          ];
+          
+          const pullExercises = [
+            ...(exercisesMap.back || []),
+            ...(exercisesMap.biceps || [])
+          ];
+          
+          const legExercises = [
+            ...(exercisesMap.quads || []),
+            ...(exercisesMap.hamstrings || []),
+            ...(exercisesMap.calves || []),
+            ...(exercisesMap.glutes || [])
+          ];
+          
+          // If we have real data, update workouts
+          if (pushExercises.length > 0 || pullExercises.length > 0 || legExercises.length > 0) {
+            const updatedWorkouts = workouts.map(workout => {
+              if (workout.title.includes('Push')) {
+                return { ...workout, exercises: pushExercises.length > 0 ? pushExercises : workout.exercises };
+              } else if (workout.title.includes('Pull')) {
+                return { ...workout, exercises: pullExercises.length > 0 ? pullExercises : workout.exercises };
+              } else if (workout.title.includes('Leg')) {
+                return { ...workout, exercises: legExercises.length > 0 ? legExercises : workout.exercises };
+              }
+              return workout;
+            });
+            
+            setWorkouts(updatedWorkouts);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching exercises:', error);
+      }
+    };
+    
+    const fetchProteinFoods = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('protein_foods')
+          .select('*');
+
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          // Map data to ProteinFood type
+          const foods: ProteinFood[] = data.map((food: any) => ({
+            id: food.id,
+            name: food.name,
+            proteinPer100g: food.protein_per_100g,
+            budget: food.budget_level,
+            servingSuggestion: food.serving_suggestion,
+            imageUrl: food.image_url
+          }));
+          
+          setProteinFoods(foods);
+        } else {
+          // If no data in database, load mock data
+          setProteinFoods(mockProteinFoods);
+        }
+      } catch (error) {
+        console.error('Error fetching protein foods:', error);
+      }
+    };
+    
+    fetchExercises();
+    fetchProteinFoods();
+  }, []);
+
   // Effect to calculate protein goal when user changes
   useEffect(() => {
     if (!user) {
+      setIsLoading(false);
       return;
     }
     
@@ -424,26 +541,63 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     const calculatedGoal = Math.round(user.weightInKg * proteinMultiplier);
     
-    setProteinGoal(prev => ({
-      dailyGrams: calculatedGoal,
-      consumed: prev.consumed
-    }));
-    
-    // Load progress entries from localStorage
-    const storedEntries = localStorage.getItem(`fittrack_progress_${user.id}`);
-    if (storedEntries) {
+    // Fetch today's protein intake
+    const fetchTodaysProtein = async () => {
       try {
-        const parsedEntries = JSON.parse(storedEntries).map((entry: any) => ({
-          ...entry,
-          date: new Date(entry.date)
-        }));
-        setProgressEntries(parsedEntries);
+        const today = new Date();
+        const { data, error } = await supabase
+          .from('protein_tracking')
+          .select('grams')
+          .eq('user_id', user.id)
+          .gte('recorded_at', startOfDay(today).toISOString())
+          .lte('recorded_at', endOfDay(today).toISOString())
+          .maybeSingle();
+          
+        if (error) throw error;
+        
+        setProteinGoal({
+          dailyGrams: calculatedGoal,
+          consumed: data?.grams || 0
+        });
       } catch (error) {
-        console.error('Failed to parse progress entries', error);
+        console.error('Error fetching protein data:', error);
+        setProteinGoal({
+          dailyGrams: calculatedGoal,
+          consumed: 0
+        });
       }
-    }
+    };
     
-    setIsLoading(false);
+    // Fetch progress entries
+    const fetchProgressEntries = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('weight_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('recorded_at', { ascending: false })
+          .limit(30);
+          
+        if (error) throw error;
+        
+        const entries: ProgressEntry[] = data.map((entry: any) => ({
+          date: new Date(entry.recorded_at),
+          weight: entry.weight_kg,
+          sleepHours: 0, // These will be filled in later if needed
+          proteinConsumed: 0,
+          workoutCompleted: false
+        }));
+        
+        setProgressEntries(entries);
+      } catch (error) {
+        console.error('Error fetching progress entries:', error);
+      }
+      
+      setIsLoading(false);
+    };
+    
+    fetchTodaysProtein();
+    fetchProgressEntries();
   }, [user]);
 
   const getTodaysWorkout = () => {
@@ -456,74 +610,460 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return workouts.find(workout => workout.day === day);
   };
 
-  const markWorkoutDone = () => {
+  const markWorkoutDone = async () => {
     if (!user) return;
     
-    const today = new Date().toISOString().split('T')[0];
-    const existingEntry = progressEntries.find(
-      entry => new Date(entry.date).toISOString().split('T')[0] === today
-    );
-    
-    if (existingEntry) {
-      // Update existing entry
-      const updatedEntries = progressEntries.map(entry => 
-        new Date(entry.date).toISOString().split('T')[0] === today 
-          ? { ...entry, workoutCompleted: true }
-          : entry
-      );
+    try {
+      const todayWorkout = getTodaysWorkout();
+      if (!todayWorkout) {
+        toast({
+          title: "No workout scheduled",
+          description: "There's no workout scheduled for today.",
+        });
+        return;
+      }
       
-      setProgressEntries(updatedEntries);
-      localStorage.setItem(`fittrack_progress_${user.id}`, JSON.stringify(updatedEntries));
-    } else {
-      // Create new entry
-      const newEntry: ProgressEntry = {
-        date: new Date(),
-        weight: user.weightInKg,
-        sleepHours: 7, // Default
-        proteinConsumed: proteinGoal.consumed,
-        workoutCompleted: true
-      };
+      // Record workout completion
+      const { error: workoutError } = await supabase
+        .from('workout_completions')
+        .insert({
+          user_id: user.id,
+          workout_day: todayWorkout.day,
+          workout_title: todayWorkout.title
+        });
       
-      const updatedEntries = [...progressEntries, newEntry];
-      setProgressEntries(updatedEntries);
-      localStorage.setItem(`fittrack_progress_${user.id}`, JSON.stringify(updatedEntries));
+      if (workoutError) throw workoutError;
+      
+      // Update streak and completed workouts count
+      let streak = user.workoutStreak;
+      
+      // Check if there was a workout completed yesterday to maintain streak
+      const yesterday = subDays(new Date(), 1);
+      
+      const { data: yesterdayWorkout, error: yesterdayError } = await supabase
+        .from('workout_completions')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('completed_at', startOfDay(yesterday).toISOString())
+        .lte('completed_at', endOfDay(yesterday).toISOString())
+        .maybeSingle();
+      
+      if (yesterdayError) throw yesterdayError;
+      
+      if (yesterdayWorkout) {
+        // Maintain or increase streak
+        streak += 1;
+      } else {
+        // Streak broken, start new streak
+        streak = 1;
+      }
+      
+      // Update profile with new streak and completed workouts
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          workout_streak: streak,
+          completed_workouts: user.completedWorkouts + 1
+        })
+        .eq('id', user.id);
+      
+      if (updateError) throw updateError;
+      
+      toast({
+        title: "Workout Completed!",
+        description: `Great job! Your streak is now ${streak} days.`,
+      });
+      
+      // Fetch updated user profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+        
+      if (profileError) throw profileError;
+        
+      // Note: AuthContext will pick up the user profile changes automatically
+    } catch (error: any) {
+      console.error('Error recording workout:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to record workout completion",
+        variant: "destructive",
+      });
     }
-    
-    toast({
-      title: "Workout Completed!",
-      description: "Great job! Your workout has been logged for today.",
-    });
   };
 
-  const updateProteinConsumed = (grams: number) => {
-    setProteinGoal(prev => ({
-      ...prev,
-      consumed: grams
-    }));
-    
-    toast({
-      title: "Protein Intake Updated",
-      description: `You've logged ${grams}g of protein today.`,
-    });
-  };
-
-  const addProgressEntry = (entry: Omit<ProgressEntry, 'date'>) => {
+  const updateProteinConsumed = async (grams: number) => {
     if (!user) return;
     
-    const newEntry: ProgressEntry = {
-      ...entry,
-      date: new Date()
-    };
+    try {
+      const today = new Date();
+      
+      // Check if there's already a protein entry for today
+      const { data: existingEntry, error: fetchError } = await supabase
+        .from('protein_tracking')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('recorded_at', startOfDay(today).toISOString())
+        .lte('recorded_at', endOfDay(today).toISOString())
+        .maybeSingle();
+        
+      if (fetchError) throw fetchError;
+      
+      if (existingEntry) {
+        // Update existing entry
+        const { error: updateError } = await supabase
+          .from('protein_tracking')
+          .update({ grams })
+          .eq('id', existingEntry.id);
+          
+        if (updateError) throw updateError;
+      } else {
+        // Create new entry
+        const { error: insertError } = await supabase
+          .from('protein_tracking')
+          .insert({ user_id: user.id, grams });
+          
+        if (insertError) throw insertError;
+      }
+      
+      setProteinGoal(prev => ({
+        ...prev,
+        consumed: grams
+      }));
+      
+      toast({
+        title: "Protein Intake Updated",
+        description: `You've logged ${grams}g of protein today.`,
+      });
+    } catch (error: any) {
+      console.error('Error updating protein intake:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update protein intake",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const addProgressEntry = async (entry: Omit<ProgressEntry, 'date'>) => {
+    if (!user) return;
     
-    const updatedEntries = [...progressEntries, newEntry];
-    setProgressEntries(updatedEntries);
+    try {
+      // Record weight in weight history
+      const { error: weightError } = await supabase
+        .from('weight_history')
+        .insert({ 
+          user_id: user.id, 
+          weight_kg: entry.weight
+        });
+      
+      if (weightError) throw weightError;
+      
+      // Update profile weight
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ weight_kg: entry.weight })
+        .eq('id', user.id);
+      
+      if (profileError) throw profileError;
+      
+      // Update protein tracking
+      await updateProteinConsumed(entry.proteinConsumed);
+      
+      // If workout was completed, mark it done
+      if (entry.workoutCompleted) {
+        await markWorkoutDone();
+      }
+      
+      // Refresh progress entries
+      const { data: entriesData, error: entriesError } = await supabase
+        .from('weight_history')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('recorded_at', { ascending: false })
+        .limit(30);
+        
+      if (entriesError) throw entriesError;
+      
+      const updatedEntries: ProgressEntry[] = entriesData.map((weightEntry: any) => ({
+        date: new Date(weightEntry.recorded_at),
+        weight: weightEntry.weight_kg,
+        sleepHours: entry.sleepHours || 0,
+        proteinConsumed: entry.proteinConsumed || 0,
+        workoutCompleted: entry.workoutCompleted || false,
+        measurements: entry.measurements
+      }));
+      
+      setProgressEntries(updatedEntries);
+      
+      toast({
+        title: "Progress Tracked",
+        description: "Your progress data has been saved.",
+      });
+    } catch (error: any) {
+      console.error('Error saving progress:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save progress data",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Generate Excel report of user progress
+  const generateExcelReport = async () => {
+    if (!user) return;
     
-    localStorage.setItem(`fittrack_progress_${user.id}`, JSON.stringify(updatedEntries));
+    try {
+      // Fetch comprehensive progress data
+      const [weightData, proteinData, workoutData] = await Promise.all([
+        supabase
+          .from('weight_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('recorded_at', { ascending: false }),
+          
+        supabase
+          .from('protein_tracking')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('recorded_at', { ascending: false }),
+          
+        supabase
+          .from('workout_completions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('completed_at', { ascending: false })
+      ]);
+      
+      if (weightData.error) throw weightData.error;
+      if (proteinData.error) throw proteinData.error;
+      if (workoutData.error) throw workoutData.error;
+      
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      
+      // Create weight sheet
+      const weightSheet = XLSX.utils.json_to_sheet(weightData.data.map((item: any) => ({
+        Date: new Date(item.recorded_at).toLocaleDateString(),
+        'Weight (kg)': item.weight_kg
+      })));
+      
+      // Create protein sheet
+      const proteinSheet = XLSX.utils.json_to_sheet(proteinData.data.map((item: any) => ({
+        Date: new Date(item.recorded_at).toLocaleDateString(),
+        'Protein (g)': item.grams
+      })));
+      
+      // Create workout sheet
+      const workoutSheet = XLSX.utils.json_to_sheet(workoutData.data.map((item: any) => ({
+        Date: new Date(item.completed_at).toLocaleDateString(),
+        'Workout': item.workout_title,
+        'Day': item.workout_day
+      })));
+      
+      // Add sheets to workbook
+      XLSX.utils.book_append_sheet(wb, weightSheet, 'Weight History');
+      XLSX.utils.book_append_sheet(wb, proteinSheet, 'Protein Tracking');
+      XLSX.utils.book_append_sheet(wb, workoutSheet, 'Workouts Completed');
+      
+      // Generate Excel file
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `FitTrack_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+      
+      toast({
+        title: "Excel Report Generated",
+        description: "Your fitness progress report has been downloaded.",
+      });
+    } catch (error: any) {
+      console.error('Error generating Excel report:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate Excel report",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Generate PDF report of user progress
+  const generatePDFReport = async () => {
+    if (!user) return;
     
-    toast({
-      title: "Progress Tracked",
-      description: "Your progress data has been saved.",
-    });
+    try {
+      // Fetch comprehensive progress data
+      const [weightData, proteinData, workoutData, profileData] = await Promise.all([
+        supabase
+          .from('weight_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('recorded_at', { ascending: false })
+          .limit(10),
+          
+        supabase
+          .from('protein_tracking')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('recorded_at', { ascending: false })
+          .limit(10),
+          
+        supabase
+          .from('workout_completions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('completed_at', { ascending: false })
+          .limit(10),
+          
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle()
+      ]);
+      
+      if (weightData.error) throw weightData.error;
+      if (proteinData.error) throw proteinData.error;
+      if (workoutData.error) throw workoutData.error;
+      if (profileData.error) throw profileData.error;
+      
+      // Create PDF document
+      const pdfDoc = await PDFDocument.create();
+      const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      
+      // Add page
+      const page = pdfDoc.addPage([600, 800]);
+      
+      // Add title
+      page.drawText('FitTrack Progress Report', {
+        x: 50,
+        y: 750,
+        size: 24,
+        font: helveticaBold,
+        color: rgb(0, 0.3, 0.7),
+      });
+      
+      // Add user info
+      page.drawText(`Name: ${user.name}`, {
+        x: 50,
+        y: 720,
+        size: 12,
+        font: helvetica,
+      });
+      
+      page.drawText(`Current Weight: ${user.weightInKg} kg`, {
+        x: 50,
+        y: 700,
+        size: 12,
+        font: helvetica,
+      });
+      
+      page.drawText(`Goal: ${user.goalType.replace('_', ' ')}`, {
+        x: 50,
+        y: 680,
+        size: 12,
+        font: helvetica,
+      });
+      
+      page.drawText(`Workout Streak: ${user.workoutStreak} days`, {
+        x: 50,
+        y: 660,
+        size: 12,
+        font: helvetica,
+      });
+      
+      page.drawText(`Completed Workouts: ${user.completedWorkouts}`, {
+        x: 50,
+        y: 640,
+        size: 12,
+        font: helvetica,
+      });
+      
+      // Add weight history section
+      page.drawText('Weight History', {
+        x: 50,
+        y: 600,
+        size: 16,
+        font: helveticaBold,
+        color: rgb(0, 0.3, 0.7),
+      });
+      
+      let y = 580;
+      weightData.data.slice(0, 5).forEach((item: any, index: number) => {
+        page.drawText(`${new Date(item.recorded_at).toLocaleDateString()}: ${item.weight_kg} kg`, {
+          x: 50,
+          y: y - (index * 20),
+          size: 10,
+          font: helvetica,
+        });
+      });
+      
+      // Add protein tracking section
+      page.drawText('Recent Protein Intake', {
+        x: 50,
+        y: 480,
+        size: 16,
+        font: helveticaBold,
+        color: rgb(0, 0.3, 0.7),
+      });
+      
+      y = 460;
+      proteinData.data.slice(0, 5).forEach((item: any, index: number) => {
+        page.drawText(`${new Date(item.recorded_at).toLocaleDateString()}: ${item.grams} g`, {
+          x: 50,
+          y: y - (index * 20),
+          size: 10,
+          font: helvetica,
+        });
+      });
+      
+      // Add workouts section
+      page.drawText('Recent Workouts', {
+        x: 50,
+        y: 360,
+        size: 16,
+        font: helveticaBold,
+        color: rgb(0, 0.3, 0.7),
+      });
+      
+      y = 340;
+      workoutData.data.slice(0, 5).forEach((item: any, index: number) => {
+        page.drawText(`${new Date(item.completed_at).toLocaleDateString()}: ${item.workout_title}`, {
+          x: 50,
+          y: y - (index * 20),
+          size: 10,
+          font: helvetica,
+        });
+      });
+      
+      // Add footer
+      page.drawText(`Report generated on ${new Date().toLocaleDateString()}`, {
+        x: 50,
+        y: 50,
+        size: 10,
+        font: helvetica,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+      
+      // Save the PDF
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      saveAs(blob, `FitTrack_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+      
+      toast({
+        title: "PDF Report Generated",
+        description: "Your fitness progress report has been downloaded.",
+      });
+    } catch (error: any) {
+      console.error('Error generating PDF report:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate PDF report",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredProteinFoods = budgetFilter === 'all'
@@ -545,6 +1085,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         filteredProteinFoods,
         progressEntries,
         addProgressEntry,
+        generateExcelReport,
+        generatePDFReport,
         isLoading
       }}
     >

@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Dumbbell } from 'lucide-react';
+import { gradients } from '@/styles/gradients';
+import { useTheme } from 'next-themes';
 
 // Login form schema
 const loginSchema = z.object({
@@ -37,6 +39,8 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"login" | "signup">("login");
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   
   // Form for login
   const loginForm = useForm<LoginFormValues>({
@@ -88,11 +92,11 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900 px-4">
+    <div className={`flex items-center justify-center min-h-screen px-4 ${isDark ? gradients.header.dark : gradients.header.light}`}>
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-6">
-          <div className="flex items-center">
-            <Dumbbell className="h-12 w-12 text-primary mr-2" />
+          <div className={`flex items-center p-3 rounded-full ${isDark ? 'bg-gray-800/50' : 'bg-white/50'} backdrop-blur-sm shadow-lg`}>
+            <Dumbbell className={`h-12 w-12 ${isDark ? 'text-indigo-400' : 'text-indigo-600'} mr-2`} />
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">FitTrack</h1>
               <p className="text-sm text-gray-600 dark:text-gray-400">Workout & Nutrition App</p>
@@ -100,8 +104,8 @@ const LoginPage = () => {
           </div>
         </div>
         
-        <Card className="shadow-lg">
-          <CardHeader>
+        <Card className={`shadow-lg border-0 ${isDark ? 'bg-gray-800/80' : 'bg-white/80'} backdrop-blur-lg`}>
+          <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">
               Welcome to FitTrack
             </CardTitle>
@@ -147,7 +151,11 @@ const LoginPage = () => {
                       )}
                     />
                     
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    <Button 
+                      type="submit" 
+                      className={`w-full ${isDark ? gradients.primary.dark : gradients.primary.light} border-0`} 
+                      disabled={isLoading}
+                    >
                       {isLoading ? "Logging in..." : "Login"}
                     </Button>
                     
@@ -217,7 +225,11 @@ const LoginPage = () => {
                       )}
                     />
                     
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                    <Button 
+                      type="submit" 
+                      className={`w-full ${isDark ? gradients.primary.dark : gradients.primary.light} border-0`}
+                      disabled={isLoading}
+                    >
                       {isLoading ? "Creating account..." : "Create Account"}
                     </Button>
                   </form>

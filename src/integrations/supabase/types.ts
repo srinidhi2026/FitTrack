@@ -9,7 +9,186 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      exercises: {
+        Row: {
+          id: string
+          image_url: string
+          instructions: string
+          muscle_group: string
+          name: string
+          reps_range: string
+          sets: number
+        }
+        Insert: {
+          id?: string
+          image_url: string
+          instructions: string
+          muscle_group: string
+          name: string
+          reps_range: string
+          sets: number
+        }
+        Update: {
+          id?: string
+          image_url?: string
+          instructions?: string
+          muscle_group?: string
+          name?: string
+          reps_range?: string
+          sets?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          completed_workouts: number | null
+          created_at: string
+          email: string
+          goal_type: string
+          id: string
+          name: string
+          weight_kg: number
+          workout_streak: number | null
+        }
+        Insert: {
+          completed_workouts?: number | null
+          created_at?: string
+          email: string
+          goal_type: string
+          id: string
+          name: string
+          weight_kg: number
+          workout_streak?: number | null
+        }
+        Update: {
+          completed_workouts?: number | null
+          created_at?: string
+          email?: string
+          goal_type?: string
+          id?: string
+          name?: string
+          weight_kg?: number
+          workout_streak?: number | null
+        }
+        Relationships: []
+      }
+      protein_foods: {
+        Row: {
+          budget_level: string
+          id: string
+          image_url: string
+          name: string
+          protein_per_100g: number
+          serving_suggestion: string
+        }
+        Insert: {
+          budget_level: string
+          id?: string
+          image_url: string
+          name: string
+          protein_per_100g: number
+          serving_suggestion: string
+        }
+        Update: {
+          budget_level?: string
+          id?: string
+          image_url?: string
+          name?: string
+          protein_per_100g?: number
+          serving_suggestion?: string
+        }
+        Relationships: []
+      }
+      protein_tracking: {
+        Row: {
+          grams: number
+          id: string
+          recorded_at: string
+          user_id: string
+        }
+        Insert: {
+          grams: number
+          id?: string
+          recorded_at?: string
+          user_id: string
+        }
+        Update: {
+          grams?: number
+          id?: string
+          recorded_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "protein_tracking_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weight_history: {
+        Row: {
+          id: string
+          recorded_at: string
+          user_id: string
+          weight_kg: number
+        }
+        Insert: {
+          id?: string
+          recorded_at?: string
+          user_id: string
+          weight_kg: number
+        }
+        Update: {
+          id?: string
+          recorded_at?: string
+          user_id?: string
+          weight_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weight_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_completions: {
+        Row: {
+          completed_at: string
+          id: string
+          user_id: string
+          workout_day: string
+          workout_title: string
+        }
+        Insert: {
+          completed_at?: string
+          id?: string
+          user_id: string
+          workout_day: string
+          workout_title: string
+        }
+        Update: {
+          completed_at?: string
+          id?: string
+          user_id?: string
+          workout_day?: string
+          workout_title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_completions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
