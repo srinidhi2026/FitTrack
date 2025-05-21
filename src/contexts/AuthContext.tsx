@@ -88,12 +88,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data) {
+        // Type assertion to ensure the goal_type is one of the allowed values
+        const goalType = data.goal_type as "muscle" | "fat_loss" | "weight_gain" | "strength";
+        
         const user: User = {
           id: data.id,
           name: data.name,
           email: data.email,
           weightInKg: data.weight_kg,
-          goalType: data.goal_type,
+          goalType: goalType,
           workoutStreak: data.workout_streak,
           completedWorkouts: data.completed_workouts,
           createdAt: new Date(data.created_at)
@@ -258,7 +261,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateUserGoal = async (goalType: "muscle" | "fat_loss" | "weight_gain" | "strength") => {
+  const updateUserGoal = async (goalType: User['goalType']) => {
     if (!authState.user) return;
     
     try {
