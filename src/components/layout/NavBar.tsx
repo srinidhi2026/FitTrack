@@ -3,7 +3,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Menu, X, User, Dumbbell, Apple, ChartLineUp } from 'lucide-react';
+import { Menu, X, User, Dumbbell, Apple, ChartLine } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
@@ -20,7 +20,7 @@ const NavBar: React.FC = () => {
     { path: '/', label: 'Dashboard', icon: <User size={20} /> },
     { path: '/workouts', label: 'Workouts', icon: <Dumbbell size={20} /> },
     { path: '/nutrition', label: 'Nutrition', icon: <Apple size={20} /> },
-    { path: '/progress', label: 'Progress', icon: <ChartLineUp size={20} /> },
+    { path: '/progress', label: 'Progress', icon: <ChartLine size={20} /> },
   ];
 
   return (
