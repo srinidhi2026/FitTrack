@@ -447,7 +447,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const getTodaysWorkout = () => {
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'lowercase' }) as WorkoutDay;
+    // Fix: Use a valid value for weekday parameter and convert it to lowercase manually
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase() as WorkoutDay;
     return workouts.find(workout => workout.day === today);
   };
 
