@@ -7,14 +7,16 @@ import { gradients } from '@/styles/gradients';
 
 interface GradientCardProps extends React.HTMLAttributes<HTMLDivElement> {
   gradientType?: keyof typeof gradients;
-  hoverEffect?: 'lift' | 'glow' | 'none';
+  hoverEffect?: 'lift' | 'glow' | 'pulse' | 'scale' | 'none';
   children: React.ReactNode;
 }
 
 // Hover effect styles
 const hoverEffects = {
   lift: 'transition-transform duration-300 ease-in-out hover:translate-y-[-5px]',
-  glow: 'transition-shadow duration-300 ease-in-out hover:shadow-lg hover:shadow-primary-300/25',
+  glow: 'transition-shadow duration-300 ease-in-out hover:shadow-lg hover:shadow-primary/25',
+  pulse: 'hover:animate-[pulse_2s_infinite]',
+  scale: 'transition-transform duration-300 ease-in-out hover:scale-[1.02]',
   none: ''
 };
 

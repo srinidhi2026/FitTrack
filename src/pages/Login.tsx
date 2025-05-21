@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -92,11 +91,11 @@ const LoginPage = () => {
   }
 
   return (
-    <div className={`flex items-center justify-center min-h-screen px-4 ${isDark ? gradients.header.dark : gradients.header.light}`}>
+    <div className={`flex items-center justify-center min-h-screen px-4 ${isDark ? 'bg-gradient-to-br from-gray-900 via-purple-900/30 to-gray-900' : 'bg-gradient-to-br from-purple-100 via-pink-50 to-white'}`}>
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-6">
-          <div className={`flex items-center p-3 rounded-full ${isDark ? 'bg-gray-800/50' : 'bg-white/50'} backdrop-blur-sm shadow-lg`}>
-            <Dumbbell className={`h-12 w-12 ${isDark ? 'text-indigo-400' : 'text-indigo-600'} mr-2`} />
+          <div className={`flex items-center p-3 rounded-full ${isDark ? 'bg-gray-800/50 backdrop-blur-sm' : 'bg-white/70 backdrop-blur-sm'} shadow-lg`}>
+            <Dumbbell className={`h-12 w-12 ${isDark ? 'text-fitness-purple' : 'text-fitness-purple'} mr-2`} />
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">FitTrack</h1>
               <p className="text-sm text-gray-600 dark:text-gray-400">Workout & Nutrition App</p>
@@ -104,7 +103,7 @@ const LoginPage = () => {
           </div>
         </div>
         
-        <Card className={`shadow-lg border-0 ${isDark ? 'bg-gray-800/80' : 'bg-white/80'} backdrop-blur-lg`}>
+        <Card className={`shadow-xl border-0 ${isDark ? 'bg-gray-800/80' : 'bg-white/90'} backdrop-blur-lg`}>
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl text-center">
               Welcome to FitTrack
@@ -153,7 +152,7 @@ const LoginPage = () => {
                     
                     <Button 
                       type="submit" 
-                      className={`w-full ${isDark ? gradients.primary.dark : gradients.primary.light} border-0`} 
+                      className={`w-full bg-gradient-to-r from-fitness-purple to-fitness-magenta hover:from-fitness-purple/90 hover:to-fitness-magenta/90 border-0`} 
                       disabled={isLoading}
                     >
                       {isLoading ? "Logging in..." : "Login"}
@@ -227,7 +226,7 @@ const LoginPage = () => {
                     
                     <Button 
                       type="submit" 
-                      className={`w-full ${isDark ? gradients.primary.dark : gradients.primary.light} border-0`}
+                      className={`w-full bg-gradient-to-r from-fitness-purple to-fitness-magenta hover:from-fitness-purple/90 hover:to-fitness-magenta/90 border-0`}
                       disabled={isLoading}
                     >
                       {isLoading ? "Creating account..." : "Create Account"}

@@ -58,7 +58,12 @@ export default {
 					darkBlue: '#1E40AF',
 					green: '#10B981',
 					lightGreen: '#D1FAE5',
-					gray: '#F3F4F6'
+					gray: '#F3F4F6',
+					purple: '#9B87F5', // Adding vibrant purple
+					magenta: '#D946EF', // Adding magenta
+					orange: '#F97316', // Adding vibrant orange
+					skyBlue: '#38BDF8', // Adding sky blue
+					coral: '#FF6B6B'    // Adding coral
 				}
 			},
 			borderRadius: {

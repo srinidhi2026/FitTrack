@@ -32,7 +32,7 @@ const NavBar: React.FC = () => {
               to="/" 
               className="flex-shrink-0 flex items-center"
             >
-              <Dumbbell className="h-8 w-8 text-primary mr-2" />
+              <Dumbbell className="h-8 w-8 text-fitness-purple dark:text-fitness-purple mr-2" />
               <span className="text-xl font-bold text-gray-900 dark:text-white">FitTrack</span>
             </Link>
           </div>
@@ -46,7 +46,7 @@ const NavBar: React.FC = () => {
                 className={cn(
                   'px-3 py-2 rounded-md text-sm font-medium flex items-center space-x-1',
                   isActive(item.path) 
-                    ? 'bg-primary text-white' 
+                    ? 'bg-gradient-to-r from-fitness-purple to-fitness-magenta text-white' 
                     : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                 )}
               >
@@ -62,13 +62,14 @@ const NavBar: React.FC = () => {
               <Switch
                 checked={theme === 'dark'}
                 onCheckedChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="data-[state=checked]:bg-fitness-purple"
               />
             </div>
 
             <Button
               onClick={logout}
               variant="outline"
-              className="ml-4"
+              className="ml-4 border-fitness-purple text-fitness-purple hover:bg-fitness-purple/10 dark:border-fitness-purple dark:text-fitness-purple dark:hover:bg-fitness-purple/20"
             >
               Logout
             </Button>
@@ -97,7 +98,7 @@ const NavBar: React.FC = () => {
                 className={cn(
                   'block px-3 py-2 rounded-md text-base font-medium flex items-center',
                   isActive(item.path) 
-                    ? 'bg-primary text-white' 
+                    ? 'bg-gradient-to-r from-fitness-purple to-fitness-magenta text-white' 
                     : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                 )}
                 onClick={() => setMobileMenuOpen(false)}
@@ -114,13 +115,14 @@ const NavBar: React.FC = () => {
               <Switch
                 checked={theme === 'dark'}
                 onCheckedChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="data-[state=checked]:bg-fitness-purple"
               />
             </div>
             
             <Button
               onClick={logout}
               variant="outline"
-              className="w-full mt-2"
+              className="w-full mt-2 border-fitness-purple text-fitness-purple hover:bg-fitness-purple/10 dark:border-fitness-purple dark:text-fitness-purple dark:hover:bg-fitness-purple/20"
             >
               Logout
             </Button>
