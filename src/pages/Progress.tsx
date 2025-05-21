@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import {
   Tooltip, ResponsiveContainer, Legend, BarChart, Bar 
 } from 'recharts';
 import { Calendar, Weight, Clock, Utensils, Ruler } from 'lucide-react';
+import { format } from 'date-fns';
 
 const ProgressPage = () => {
   const { user } = useAuth();
@@ -53,16 +54,16 @@ const ProgressPage = () => {
     setLegs('');
   };
   
-  // Prepare chart data
+  // Prepare chart data with proper date formatting
   const weightChartData = progressEntries.map(entry => ({
-    date: new Date(entry.date).toLocaleDateString(),
+    date: format(new Date(entry.date), 'dd/MM/yy'),
     weight: entry.weight
   }));
   
   const measurementsData = progressEntries
     .filter(entry => entry.measurements)
     .map(entry => ({
-      date: new Date(entry.date).toLocaleDateString(),
+      date: format(new Date(entry.date), 'dd/MM/yy'),
       arms: entry.measurements?.arms,
       chest: entry.measurements?.chest,
       waist: entry.measurements?.waist,
@@ -72,7 +73,7 @@ const ProgressPage = () => {
   const workoutCompletionData = progressEntries
     .slice(-7) // Last 7 entries
     .map(entry => ({
-      date: new Date(entry.date).toLocaleDateString(),
+      date: format(new Date(entry.date), 'dd/MM/yy'),
       completed: entry.workoutCompleted ? 1 : 0
     }));
   
@@ -233,7 +234,7 @@ const ProgressPage = () => {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-500">
+              <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
                 <p>Log your weight to see the chart here</p>
               </div>
             )}
@@ -293,7 +294,7 @@ const ProgressPage = () => {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-500">
+              <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
                 <p>Log your measurements to see the chart here</p>
               </div>
             )}
@@ -331,7 +332,7 @@ const ProgressPage = () => {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-500">
+              <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
                 <p>Log your workouts to see the chart here</p>
               </div>
             )}

@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Workout, Exercise, WorkoutDay } from '@/types/workout';
 import { ProteinFood, ProteinGoal, BudgetLevel } from '@/types/nutrition';
@@ -17,6 +18,8 @@ interface DataContextType {
   getTodaysWorkout: () => Workout | undefined;
   getWorkoutByDay: (day: WorkoutDay) => Workout | undefined;
   markWorkoutDone: () => Promise<void>;
+  unmarkWorkoutDone: () => Promise<void>;
+  isTodayWorkoutCompleted: boolean;
   
   // Nutrition
   proteinGoal: ProteinGoal;
@@ -390,6 +393,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // State for workouts
   const [workouts, setWorkouts] = useState<Workout[]>(initialWorkouts);
+  const [isTodayWorkoutCompleted, setIsTodayWorkoutCompleted] = useState(false);
   
   // State for protein tracking
   const [proteinGoal, setProteinGoal] = useState<ProteinGoal>({
@@ -407,6 +411,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Loading state
   const [isLoading, setIsLoading] = useState(true);
 
+  // Check if today's workout is already marked as completed
+  const checkTodayWorkoutStatus = async () => {
+    if (!user) return;
+    
+    try {
+      const today = new Date();
+      const { data, error } = await supabase
+        .from('workout_completions')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('completed_at', startOfDay(today).toISOString())
+        .lte('completed_at', endOfDay(today).toISOString())
+        .maybeSingle();
+        
+      if (error) throw error;
+      
+      setIsTodayWorkoutCompleted(!!data);
+    } catch (error) {
+      console.error('Error checking workout status:', error);
+    }
+  };
+  
   // Load exercises and protein foods data
   useEffect(() => {
     const fetchExercises = async () => {
@@ -520,47 +546,62 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     
-    let proteinMultiplier = 1.6; // Default
+    // Use lower protein multiplier range (1.1 - 1.5g per kg)
+    let proteinMultiplier = 1.2; // Default
     
     switch (user.goalType) {
       case 'muscle':
-        proteinMultiplier = 2.0;
+        proteinMultiplier = 1.5;
         break;
       case 'fat_loss':
-        proteinMultiplier = 2.2;
+        proteinMultiplier = 1.5;
         break;
       case 'weight_gain':
-        proteinMultiplier = 1.8;
+        proteinMultiplier = 1.3;
         break;
       case 'strength':
-        proteinMultiplier = 1.6;
+        proteinMultiplier = 1.2;
         break;
       default:
-        proteinMultiplier = 1.6;
+        proteinMultiplier = 1.2;
     }
     
     const calculatedGoal = Math.round(user.weightInKg * proteinMultiplier);
     
-    // Fetch today's protein intake
-    const fetchTodaysProtein = async () => {
+    // Fetch today's protein intake and check workout status
+    const fetchUserData = async () => {
       try {
         const today = new Date();
-        const { data, error } = await supabase
-          .from('protein_tracking')
-          .select('grams')
-          .eq('user_id', user.id)
-          .gte('recorded_at', startOfDay(today).toISOString())
-          .lte('recorded_at', endOfDay(today).toISOString())
-          .maybeSingle();
+        
+        const [proteinResponse, workoutResponse] = await Promise.all([
+          supabase
+            .from('protein_tracking')
+            .select('grams')
+            .eq('user_id', user.id)
+            .gte('recorded_at', startOfDay(today).toISOString())
+            .lte('recorded_at', endOfDay(today).toISOString())
+            .maybeSingle(),
+            
+          supabase
+            .from('workout_completions')
+            .select('*')
+            .eq('user_id', user.id)
+            .gte('completed_at', startOfDay(today).toISOString())
+            .lte('completed_at', endOfDay(today).toISOString())
+            .maybeSingle()
+        ]);
           
-        if (error) throw error;
+        if (proteinResponse.error) throw proteinResponse.error;
+        if (workoutResponse.error) throw workoutResponse.error;
         
         setProteinGoal({
           dailyGrams: calculatedGoal,
-          consumed: data?.grams || 0
+          consumed: proteinResponse.data?.grams || 0
         });
+        
+        setIsTodayWorkoutCompleted(!!workoutResponse.data);
       } catch (error) {
-        console.error('Error fetching protein data:', error);
+        console.error('Error fetching user data:', error);
         setProteinGoal({
           dailyGrams: calculatedGoal,
           consumed: 0
@@ -583,9 +624,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const entries: ProgressEntry[] = data.map((entry: any) => ({
           date: new Date(entry.recorded_at),
           weight: entry.weight_kg,
-          sleepHours: 0, // These will be filled in later if needed
-          proteinConsumed: 0,
-          workoutCompleted: false
+          sleepHours: entry.sleep_hours || 0,
+          proteinConsumed: entry.protein_consumed || 0,
+          workoutCompleted: entry.workout_completed || false,
+          measurements: entry.measurements || undefined
         }));
         
         setProgressEntries(entries);
@@ -596,7 +638,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
     };
     
-    fetchTodaysProtein();
+    fetchUserData();
     fetchProgressEntries();
   }, [user]);
 
@@ -619,6 +661,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast({
           title: "No workout scheduled",
           description: "There's no workout scheduled for today.",
+        });
+        return;
+      }
+      
+      // Check if workout is already marked as completed today
+      const today = new Date();
+      const { data: existingWorkout, error: checkError } = await supabase
+        .from('workout_completions')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('completed_at', startOfDay(today).toISOString())
+        .lte('completed_at', endOfDay(today).toISOString())
+        .maybeSingle();
+        
+      if (checkError) throw checkError;
+      
+      if (existingWorkout) {
+        toast({
+          title: "Already Completed",
+          description: "You've already marked today's workout as complete.",
         });
         return;
       }
@@ -669,26 +731,83 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (updateError) throw updateError;
       
+      setIsTodayWorkoutCompleted(true);
+      
       toast({
         title: "Workout Completed!",
         description: `Great job! Your streak is now ${streak} days.`,
       });
       
-      // Fetch updated user profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-        
-      if (profileError) throw profileError;
-        
-      // Note: AuthContext will pick up the user profile changes automatically
     } catch (error: any) {
       console.error('Error recording workout:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to record workout completion",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const unmarkWorkoutDone = async () => {
+    if (!user) return;
+    
+    try {
+      const today = new Date();
+      
+      // Find today's workout completion entry
+      const { data: workoutEntry, error: findError } = await supabase
+        .from('workout_completions')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('completed_at', startOfDay(today).toISOString())
+        .lte('completed_at', endOfDay(today).toISOString())
+        .maybeSingle();
+        
+      if (findError) throw findError;
+      
+      if (!workoutEntry) {
+        toast({
+          title: "No workout found",
+          description: "You haven't marked a workout as completed today.",
+        });
+        return;
+      }
+      
+      // Delete the workout completion record
+      const { error: deleteError } = await supabase
+        .from('workout_completions')
+        .delete()
+        .eq('id', workoutEntry.id);
+        
+      if (deleteError) throw deleteError;
+      
+      // Update streak and completed workouts count
+      const newStreak = user.workoutStreak > 0 ? user.workoutStreak - 1 : 0;
+      const newCompletedWorkouts = user.completedWorkouts > 0 ? user.completedWorkouts - 1 : 0;
+      
+      // Update profile with reduced streak and completed workouts
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          workout_streak: newStreak,
+          completed_workouts: newCompletedWorkouts
+        })
+        .eq('id', user.id);
+      
+      if (updateError) throw updateError;
+      
+      setIsTodayWorkoutCompleted(false);
+      
+      toast({
+        title: "Workout Unmarked",
+        description: `Today's workout has been removed from your streak.`,
+      });
+      
+    } catch (error: any) {
+      console.error('Error unmarking workout:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to unmark workout completion",
         variant: "destructive",
       });
     }
@@ -751,12 +870,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
     
     try {
-      // Record weight in weight history
+      // Store additional fields in weight_history table
       const { error: weightError } = await supabase
         .from('weight_history')
         .insert({ 
           user_id: user.id, 
-          weight_kg: entry.weight
+          weight_kg: entry.weight,
+          sleep_hours: entry.sleepHours,
+          protein_consumed: entry.proteinConsumed,
+          workout_completed: entry.workoutCompleted,
+          measurements: entry.measurements
         });
       
       if (weightError) throw weightError;
@@ -773,7 +896,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await updateProteinConsumed(entry.proteinConsumed);
       
       // If workout was completed, mark it done
-      if (entry.workoutCompleted) {
+      if (entry.workoutCompleted && !isTodayWorkoutCompleted) {
         await markWorkoutDone();
       }
       
@@ -790,10 +913,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const updatedEntries: ProgressEntry[] = entriesData.map((weightEntry: any) => ({
         date: new Date(weightEntry.recorded_at),
         weight: weightEntry.weight_kg,
-        sleepHours: entry.sleepHours || 0,
-        proteinConsumed: entry.proteinConsumed || 0,
-        workoutCompleted: entry.workoutCompleted || false,
-        measurements: entry.measurements
+        sleepHours: weightEntry.sleep_hours || 0,
+        proteinConsumed: weightEntry.protein_consumed || 0,
+        workoutCompleted: weightEntry.workout_completed || false,
+        measurements: weightEntry.measurements
       }));
       
       setProgressEntries(updatedEntries);
@@ -1077,6 +1200,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         getTodaysWorkout,
         getWorkoutByDay,
         markWorkoutDone,
+        unmarkWorkoutDone,
+        isTodayWorkoutCompleted,
         proteinGoal,
         updateProteinConsumed,
         proteinFoods,

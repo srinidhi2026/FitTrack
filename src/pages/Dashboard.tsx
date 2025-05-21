@@ -9,25 +9,40 @@ import { Input } from '@/components/ui/input';
 import { GradientCard } from '@/components/ui/gradient-card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
-import { Calendar, CheckCircle, Trophy, Weight, Download, FileSpreadsheet } from 'lucide-react';
+import { Calendar, CheckCircle, Trophy, Weight, Download, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { gradients } from '@/styles/gradients';
 import { useTheme } from 'next-themes';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const Dashboard = () => {
   const { user } = useAuth();
   const { 
     getTodaysWorkout, 
-    markWorkoutDone, 
+    markWorkoutDone,
+    unmarkWorkoutDone,
     proteinGoal,
     updateProteinConsumed,
     generateExcelReport,
-    generatePDFReport
+    generatePDFReport,
+    isTodayWorkoutCompleted
   } = useData();
 
   const [proteinInput, setProteinInput] = useState(proteinGoal.consumed.toString());
   const [checkedExercises, setCheckedExercises] = useState<string[]>([]);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+  const [showUnmarkDialog, setShowUnmarkDialog] = useState(false);
+  const [showIncompleteDialog, setShowIncompleteDialog] = useState(false);
+  const [missedExercises, setMissedExercises] = useState<string[]>([]);
 
   const todaysWorkout = getTodaysWorkout();
   const proteinPercentage = Math.min(Math.round((proteinGoal.consumed / proteinGoal.dailyGrams) * 100), 100);
@@ -54,7 +69,30 @@ const Dashboard = () => {
   };
 
   const handleWorkoutDone = async () => {
+    // Check if all exercises are completed
+    if (todaysWorkout?.exercises && todaysWorkout.exercises.length > 0) {
+      const uncheckedExercises = todaysWorkout.exercises
+        .filter(exercise => !checkedExercises.includes(exercise.id))
+        .map(exercise => exercise.name);
+
+      if (uncheckedExercises.length > 0) {
+        setMissedExercises(uncheckedExercises);
+        setShowIncompleteDialog(true);
+        return;
+      }
+    }
+
     await markWorkoutDone();
+    setCheckedExercises([]);
+  };
+
+  const handleUnmarkWorkout = () => {
+    setShowUnmarkDialog(true);
+  };
+
+  const confirmUnmarkWorkout = async () => {
+    await unmarkWorkoutDone();
+    setShowUnmarkDialog(false);
     setCheckedExercises([]);
   };
 
@@ -71,12 +109,21 @@ const Dashboard = () => {
           </p>
         </div>
         <div className="mt-4 md:mt-0 flex space-x-2">
-          <Button 
-            onClick={handleWorkoutDone} 
-            className={isDark ? gradients.success.dark : gradients.success.light}
-          >
-            <CheckCircle className="mr-2 h-4 w-4" /> Mark Workout Done
-          </Button>
+          {isTodayWorkoutCompleted ? (
+            <Button 
+              onClick={handleUnmarkWorkout} 
+              className="bg-yellow-500 hover:bg-yellow-600 text-white"
+            >
+              <AlertTriangle className="mr-2 h-4 w-4" /> Unmark Workout
+            </Button>
+          ) : (
+            <Button 
+              onClick={handleWorkoutDone} 
+              className={isDark ? gradients.success.dark : gradients.success.light}
+            >
+              <CheckCircle className="mr-2 h-4 w-4" /> Mark Workout Done
+            </Button>
+          )}
         </div>
       </div>
 
@@ -108,7 +155,7 @@ const Dashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{user?.weightInKg || 0} kg</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{user?.weightInKg || 0} kg</div>
           </CardContent>
         </GradientCard>
         
@@ -119,7 +166,7 @@ const Dashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{user?.workoutStreak || 0} days</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{user?.workoutStreak || 0} days</div>
           </CardContent>
         </GradientCard>
         
@@ -130,7 +177,7 @@ const Dashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{user?.completedWorkouts || 0}</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{user?.completedWorkouts || 0}</div>
           </CardContent>
         </GradientCard>
       </div>
@@ -138,19 +185,19 @@ const Dashboard = () => {
       {/* Protein Tracking */}
       <GradientCard>
         <CardHeader>
-          <CardTitle>Protein Intake</CardTitle>
+          <CardTitle className="text-gray-900 dark:text-white">Protein Intake</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="flex justify-between items-center text-sm">
-              <span>Daily Goal: {proteinGoal.dailyGrams}g</span>
-              <span>Current: {proteinGoal.consumed}g ({proteinPercentage}%)</span>
+              <span className="text-gray-700 dark:text-gray-300">Daily Goal: {proteinGoal.dailyGrams}g</span>
+              <span className="text-gray-700 dark:text-gray-300">Current: {proteinGoal.consumed}g ({proteinPercentage}%)</span>
             </div>
             <Progress value={proteinPercentage} className="h-2" />
             
             <div className="flex items-end gap-4 mt-2">
               <div className="space-y-2 flex-grow">
-                <Label htmlFor="protein-input">Update protein intake (grams)</Label>
+                <Label htmlFor="protein-input" className="text-gray-700 dark:text-gray-300">Update protein intake (grams)</Label>
                 <Input
                   id="protein-input"
                   type="number"
@@ -168,7 +215,7 @@ const Dashboard = () => {
       {/* Today's Workout */}
       <GradientCard>
         <CardHeader>
-          <CardTitle>Today's Workout: {todaysWorkout?.title || 'Rest Day'}</CardTitle>
+          <CardTitle className="text-gray-900 dark:text-white">Today's Workout: {todaysWorkout?.title || 'Rest Day'}</CardTitle>
         </CardHeader>
         <CardContent>
           {todaysWorkout?.exercises && todaysWorkout.exercises.length > 0 ? (
@@ -183,9 +230,10 @@ const Dashboard = () => {
                       checked={checkedExercises.includes(exercise.id)}
                       onCheckedChange={() => handleExerciseCheck(exercise.id)}
                       className="mt-1"
+                      disabled={isTodayWorkoutCompleted}
                     />
                     <div className="flex flex-col md:flex-row w-full">
-                      <Label htmlFor={exercise.id} className="flex-grow cursor-pointer">
+                      <Label htmlFor={exercise.id} className="flex-grow cursor-pointer text-gray-800 dark:text-gray-200">
                         <span className="font-medium">{exercise.name}</span>
                         <span className="text-sm text-gray-500 dark:text-gray-400 block">
                           {exercise.sets} sets × {exercise.repsRange} reps
@@ -213,6 +261,46 @@ const Dashboard = () => {
           )}
         </CardContent>
       </GradientCard>
+
+      {/* Incomplete Workout Alert */}
+      <AlertDialog open={showIncompleteDialog} onOpenChange={setShowIncompleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Incomplete Workout</AlertDialogTitle>
+            <AlertDialogDescription>
+              You haven't marked the following exercises as completed:
+              <ul className="list-disc pl-5 mt-2">
+                {missedExercises.map((exercise, index) => (
+                  <li key={index} className="text-gray-800 dark:text-gray-200">{exercise}</li>
+                ))}
+              </ul>
+              Complete all exercises to increase your workout streak!
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Ok, I'll Complete Them</AlertDialogCancel>
+            <AlertDialogAction onClick={markWorkoutDone}>Mark Anyway</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unmark Workout Alert */}
+      <AlertDialog open={showUnmarkDialog} onOpenChange={setShowUnmarkDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unmark Today's Workout?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove today's workout from your completed list and may affect your streak. Are you sure?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmUnmarkWorkout} className="bg-red-600 hover:bg-red-700">
+              Yes, Unmark
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
