@@ -30,7 +30,11 @@ export function GradientCard({
   let hoverEffectClass = "";
   
   if (typeof hoverEffect === 'string') {
-    hoverEffectClass = hoverEffects[hoverEffect];
+    // Make sure we're handling hover effects that might be objects with light/dark variants
+    const effectValue = hoverEffects[hoverEffect];
+    hoverEffectClass = typeof effectValue === 'string' 
+      ? effectValue 
+      : (isDark ? effectValue.dark : effectValue.light);
   } else if (hoverEffect === true) {
     hoverEffectClass = hoverEffects.lift;
   }

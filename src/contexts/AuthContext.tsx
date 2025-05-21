@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, AuthState } from '@/types/user';
@@ -259,14 +258,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateUserGoal = async (goal: User['goalType']) => {
+  const updateUserGoal = async (goalType: "muscle" | "fat_loss" | "weight_gain" | "strength") => {
     if (!authState.user) return;
     
     try {
       // Update profile in database
       const { error } = await supabase
         .from('profiles')
-        .update({ goal_type: goal })
+        .update({ goal_type: goalType })
         .eq('id', authState.user.id);
       
       if (error) throw error;
@@ -274,7 +273,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Update local state
       const updatedUser = {
         ...authState.user,
-        goalType: goal
+        goalType: goalType
       };
       
       setAuthState({
